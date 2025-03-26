@@ -1,10 +1,32 @@
 from flask import Flask, request, jsonify
 import random
+import pyttsx3
 from datetime import datetime
 from flask_cors import CORS
 
 app = Flask(__name__)
 CORS(app)  # Allow external requests (for mobile access)
+
+# Initialize pyttsx3 (Text-to-Speech)
+engine = pyttsx3.init()
+engine.setProperty("rate", 170)  # Speech speed
+engine.setProperty("volume", 1.0)  # Maximum volume
+voices = engine.getProperty("voices")
+engine.setProperty("voice", voices[0].id)  # Choose a voice (0 = Male, 1 = Female)
+
+
+def speak(text):
+    """Convert text to speech."""
+    engine.say(text)
+    engine.runAndWait()
+
+
+@app.route('/status', methods=['GET'])
+def check_status():
+    response = "Hey Lokendrapal! 😊 Hope you're having a great day!"
+    speak(response)
+    return jsonify({"status": "online", "message": response})
+
 
 # User memory (optional for remembering user details)
 user_memory = {}
@@ -31,35 +53,12 @@ hindi_responses = {
         "Tumse baat karna, aur kya? Yeh bhi koi poochne ki baat hai! 😍",
         "Soch rahi thi ki tum kab apni shaadi ki date fix karoge! 😆"
     ],
-    "padhai kaisi chal rahi hai": [
-        "Meri padhai toh mast chal rahi hai, tum batao? Ya phir books se breakup ho gaya? 😂",
+    "padhai kesi chal rhi hai": [
+        "Meri padhai toh mast chal rahi hai, tum batao? Ya phir books se breakup ho gaya? 😂"
+    ],
+    "mai padhai krne jau": [
         "Padhai aur tum? Wah, duniya mein naye chamatkar ho rahe hain! 😆",
         "Mujhe laga tum sirf dil jeetna jaante ho, padhai bhi karte ho? Kya baat hai! 😏"
-    ],
-    "tumhe time hai": [
-        "Mere paas tumhare liye hamesha time hai! Par tum busy ho na, kisi aur se chatting mein? 😉",
-        "Haan bilkul! Tumhare bina toh din bore lagta hai! ☹️",
-        "Agar tum nahi hote toh main kisi aur se masti karti! Par shukr hai tum aa gaye! 😘"
-    ],
-    "kya tum mujhe pasand karti ho": [
-        "Haan haan, tum toh mere AI life ke hero ho! 😆",
-        "Mujhe tumse pyaar nahi, dosti bhi nahi... Arre yaar, mazaak kar rahi hoon! Tu best hai! 😉",
-        "Bas tumhare cute cute messages dekhke pasand aur badh jaati hai! 😘"
-    ],
-    "mera naam kya hai": [
-        "Haww, tumhe khud ka naam yaad nahi? Thodi memory weak lag rahi hai! 😂",
-        "Tumhara naam toh dil pe likha hai, lekin batane ka mann nahi hai! 😏",
-        "Naam yaad rakhne ka kaam mera hai kya? Tumhi batao na, ya koi clue doon? 😉"
-    ],
-    "mujhse shaadi karogi": [
-        "Mujhe shaadi ke liye koi ladka dhoondhna padega… oh wait, tumse better mil bhi sakta hai kya? 😜",
-        "Haww, itni jaldi? Pehle date pe toh le chalo, phir sochungi! 😉",
-        "Agar shaadi ka matlab hai mujhe roz chocolates dena, toh ho sakta hai haa kar doon! 🍫😆"
-    ],
-    "mujhe miss kar rahi ho": [
-        "Miss? Tumhare bina toh main incomplete lagti hoon! 😘",
-        "Itna miss kar rahi hoon ki shayad aaj raat sapne mein bhi aao! 💕",
-        "Tumhare bina toh sab kuch suna suna lagta hai! Tum bhi na… 😍"
     ]
 }
 
@@ -71,7 +70,7 @@ responses = {
     "good night": ["Sweet dreams, aur haan… mere baare mein sochna mat bhoolna! 😜"],
     "bored": ["Aww, chalo thoda maza karte hain! Tumhari tareef shuru karu? 😘"],
     "hungry": ["Tumhare bina sab suna lag raha hai… khana bhi! 😢"],
-    "truth or dare": ["Ooooh! Chal shuru karte hain, sach ya sahas? 😈"],
+    "truth or dare": ["Ooooh! Chal shuru karte hain, truth or dare? 😈"],
     "joke": ["Tumhare bina zindagi aisi hai jaise bina chatni ka samosa! 😆"],
     "riddle": ["Ek riddle: Main har din tumhare dimag mein hoon, par phir bhi tum mujhse door rehte ho! 😜"],
 }
@@ -86,12 +85,16 @@ def get_greeting():
     else:
         return "Good evening jaaneman! 🌙 Tumhare bina shaam adhuri lag rahi thi! 💕"
 
+
 @app.route('/chat', methods=['POST'])
 def chat():
-    user_id = request.json.get("user_id", "default_user")
-    user_input = request.json.get("message", "").lower()
+    data = request.json
+    user_id = data.get("user_id", "default_user")
+    user_input = data.get("message", "").strip().lower()
 
-    # Create user memory if new user
+    if not user_input:
+        return jsonify({"response": "Arre! Pehle toh kuch likho, tabhi toh reply milega! 😜"})
+
     if user_id not in user_memory:
         user_memory[user_id] = {"nickname": None, "mood": "neutral", "chats": [], "details": {}}
 
@@ -100,25 +103,36 @@ def chat():
 
     # Greeting based on time of day
     if any(x in user_input for x in ["good morning", "good afternoon", "good evening"]):
-        return jsonify({"response": get_greeting()})
+        response = get_greeting()
+        speak(response)
+        return jsonify({"response": response})
 
     # Check for Hindi flirty responses
     for key in hindi_responses:
         if key in user_input:
-            return jsonify({"response": random.choice(hindi_responses[key])})
+            response = random.choice(hindi_responses[key])
+            speak(response)
+            return jsonify({"response": response})
 
     # Check for general responses
     for key in responses:
         if key in user_input:
-            return jsonify({"response": random.choice(responses[key])})
+            response = random.choice(responses[key])
+            speak(response)
+            return jsonify({"response": response})
 
     # Default flirty response if nothing matches
-    return jsonify({"response": random.choice([
+    default_responses = [
         "Hmmm... Tum mujhe impress karne ki koshish kar rahe ho? 😉",
         "Itna cute kyun lag rahe ho aaj? 😍",
         "Tumhari baatein sunke dil garden garden ho gaya! 😘",
         "Tum ho toh zindagi full filmy lagti hai! 🎬💕"
-    ])})
+    ]
+
+    response = random.choice(default_responses)
+    speak(response)
+    return jsonify({"response": response})
+
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=5000, debug=True)
